@@ -1,0 +1,151 @@
+version: 2.1
+
+orbs:
+  aws-cli: circleci/aws-cli@5.1.2
+
+executors:
+  docker-executor:
+    docker:
+      - image: cimg/base:stable
+    working_directory: ~/project
+
+jobs:
+  build_and_push_docker:
+    executor: docker-executor
+    parameters:
+      service:
+        type: string
+      dockerfile:
+        type: string
+      ecr_repo:
+        type: string
+    steps:
+      - checkout
+      - setup_remote_docker:
+          docker_layer_caching: true
+      - aws-cli/setup:
+          role_arn: '${AWS_ECR_DEPLOY_ARN}'
+          role_session_name: '${AWS_SESSION_NAME}'
+          profile_name: ecr-publisher
+      - run:
+          name: Build Docker image (<< parameters.service >>)
+          command: |
+            export COMMIT_SHA="${CIRCLE_SHA1}"
+            docker build \
+              -f << parameters.dockerfile >> \
+              -t "${AWS_ECR_ACCOUNT}/<< parameters.ecr_repo >>:${COMMIT_SHA}" \
+              .
+            docker tag "${AWS_ECR_ACCOUNT}/<< parameters.ecr_repo >>:${COMMIT_SHA}" "${AWS_ECR_ACCOUNT}/<< parameters.ecr_repo >>:latest"
+      - run:
+          name: Authenticate to ECR
+          command: |
+            aws ecr get-login-password --region "${AWS_DEFAULT_REGION}" | docker login --username AWS "${AWS_ECR_ACCOUNT}" --password-stdin
+      - run:
+          name: Push to ECR (<< parameters.service >>)
+          command: |
+            docker push "${AWS_ECR_ACCOUNT}/<< parameters.ecr_repo >>:latest"
+            docker push "${AWS_ECR_ACCOUNT}/<< parameters.ecr_repo >>:${CIRCLE_SHA1}"
+
+  update_k8s_image_and_sync:
+    executor: docker-executor
+    steps:
+      - checkout
+      - run:
+          name: Set Deploy Environment
+          command: |
+            echo 'export DEPLOY_ENVIRONMENT=sandbox' >> "${BASH_ENV}"
+      - run:
+          name: Load Commit SHA
+          command: |
+            IMAGE_TAG="${CIRCLE_SHA1}"
+            echo "export IMAGE_TAG=${IMAGE_TAG}" >> "${BASH_ENV}"
+            echo "Using IMAGE_TAG: ${IMAGE_TAG}"
+      - aws-cli/setup:
+          role_arn: '${AWS_ROLE_ARN}'
+          role_session_name: '${AWS_SESSION_NAME}'
+      - run:
+          name: Authenticate to ECR
+          command: |
+            aws ecr get-login-password --region "${AWS_DEFAULT_REGION}" | docker login --username AWS --password-stdin "${AWS_ECR_ACCOUNT}"
+      - run:
+          name: Update image.tag in values.yaml
+          command: |
+            yq -i ".api.image.tag = \"${IMAGE_TAG}\"" k8s/values.yaml
+            yq -i ".frontend.image.tag = \"${IMAGE_TAG}\"" k8s/values.yaml
+            yq -i ".outputWorker.image.tag = \"${IMAGE_TAG}\"" k8s/values.yaml
+      - run:
+          name: Commit and Push Updated Values File
+          command: |
+            touch ~/.ssh/botkey
+            echo "-----BEGIN OPENSSH PRIVATE KEY-----" >> ~/.ssh/botkey
+            echo "${FIMENTOBOT_KEY}" >> ~/.ssh/botkey
+            echo "-----END OPENSSH PRIVATE KEY-----" >> ~/.ssh/botkey
+            echo "${FIMENTOBOT_KEY_PUB}" > ~/.ssh/botkey.pub
+            chmod 600 ~/.ssh/botkey
+            ssh-keyscan github.com >> ~/.ssh/known_hosts
+            eval "$(ssh-agent -s)"
+            ssh-add ~/.ssh/botkey
+
+            git config --global user.signingkey ~/.ssh/botkey
+            git config --global gpg.format ssh
+            git config --global commit.gpgSign true
+            git config user.name "fimentobot"
+            git config user.email "devops+circleci@fimento.com"
+            CURRENT_BRANCH="${CIRCLE_BRANCH}"
+            git add k8s/values*.yaml
+            git commit -S -m "Update Hook0 image tags to ${IMAGE_TAG:0:8}... for ${DEPLOY_ENVIRONMENT} [skip ci]"
+            git push origin "${CURRENT_BRANCH}"
+
+workflows:
+  version: 2
+  build-push-deploy:
+    jobs:
+      # Build all 3 images in parallel
+      - build_and_push_docker:
+          name: build-api
+          service: api
+          dockerfile: api/Dockerfile
+          ecr_repo: hook0/api
+          context:
+            - circleci-ecr-deploy
+          filters:
+            branches:
+              only:
+                - fimento/local-dev-setup
+
+      - build_and_push_docker:
+          name: build-frontend
+          service: frontend
+          dockerfile: frontend/Dockerfile
+          ecr_repo: hook0/frontend
+          context:
+            - circleci-ecr-deploy
+          filters:
+            branches:
+              only:
+                - fimento/local-dev-setup
+
+      - build_and_push_docker:
+          name: build-output-worker
+          service: output-worker
+          dockerfile: output-worker/Dockerfile
+          ecr_repo: hook0/output-worker
+          context:
+            - circleci-ecr-deploy
+          filters:
+            branches:
+              only:
+                - fimento/local-dev-setup
+
+      - update_k8s_image_and_sync:
+          requires:
+            - build-api
+            - build-frontend
+            - build-output-worker
+          context:
+            - circleci-ecr-deploy
+            - fimentobot-ci
+          filters:
+            branches:
+              only:
+                - fimento/local-dev-setup

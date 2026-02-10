@@ -1,0 +1,40 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "hook0.fullname" . }}-output-worker
+  labels:
+    {{- include "hook0.labels" . | nindent 4 }}
+    app.kubernetes.io/component: output-worker
+spec:
+  replicas: {{ .Values.outputWorker.replicaCount }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: {{ include "hook0.name" . }}-output-worker
+      app.kubernetes.io/instance: {{ .Release.Name }}
+  template:
+    metadata:
+      labels:
+        {{- include "hook0.labels" . | nindent 8 }}
+        app.kubernetes.io/component: output-worker
+        app.kubernetes.io/name: {{ include "hook0.name" . }}-output-worker
+        app.kubernetes.io/instance: {{ .Release.Name }}
+    spec:
+      containers:
+        - name: output-worker
+          image: "{{ .Values.outputWorker.image.repository }}:{{ .Values.outputWorker.image.tag }}"
+          imagePullPolicy: {{ .Values.outputWorker.image.pullPolicy | default "Always" }}
+          env:
+            {{- range $key, $value := .Values.outputWorker.env }}
+            - name: {{ $key }}
+              value: {{ $value | quote }}
+            {{- end }}
+            {{- range $key, $value := .Values.outputWorker.secretEnv }}
+            - name: {{ $key }}
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $value.secretName }}
+                  key: {{ $value.key }}
+            {{- end }}
+          resources:
+            {{- toYaml .Values.outputWorker.resources | nindent 12 }}
+      restartPolicy: Always
