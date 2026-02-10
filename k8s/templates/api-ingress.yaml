@@ -1,0 +1,47 @@
+{{- if .Values.api.ingress.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ include "hook0.fullname" . }}-api
+  labels:
+    {{- include "hook0.labels" . | nindent 4 }}
+    app.kubernetes.io/component: api
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-dns01
+    {{- range .Values.api.ingress.hosts }}
+    external-dns.alpha.kubernetes.io/hostname: {{ .host }}
+    {{- break }}
+    {{- end }}
+    konghq.com/protocols: "https"
+    konghq.com/https-redirect-status-code: "301"
+    {{- with .Values.api.ingress.annotations }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+spec:
+  {{- with .Values.api.ingress.className }}
+  ingressClassName: {{ . }}
+  {{- end }}
+  {{- if .Values.api.ingress.tls }}
+  tls:
+    {{- range .Values.api.ingress.tls }}
+    - hosts:
+        {{- range .hosts }}
+        - {{ . | quote }}
+        {{- end }}
+      secretName: {{ .secretName }}
+    {{- end }}
+  {{- end }}
+  rules:
+    {{- range .Values.api.ingress.hosts }}
+    - host: {{ .host | quote }}
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ include "hook0.fullname" $ }}-api
+                port:
+                  number: 80
+    {{- end }}
+{{- end }}

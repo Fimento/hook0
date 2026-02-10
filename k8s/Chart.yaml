@@ -1,0 +1,6 @@
+apiVersion: v2
+name: hook0
+description: Helm chart for Hook0 webhook infrastructure (API, Frontend, Output Worker)
+type: application
+version: 0.1.0
+appVersion: "1.0.0-alpha.1"
