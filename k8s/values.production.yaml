@@ -1,27 +1,34 @@
 # Production overrides for Hook0
-
 api:
   replicaCount: 2
   env:
     CORS_ALLOWED_ORIGINS: 'https://hook0.fimento.io'
     APP_URL: 'https://hook0.fimento.io'
-    DISABLE_TARGET_IP_CHECK: 'false'
   ingress:
-    className: 'kong-external'
     hosts:
-      - host: hook0-api.fimento.io
+      - host: api.hook0.fimento.io
         paths:
           - path: /
             pathType: Prefix
     tls:
-      - secretName: hook0-api-fimento-io-tls
+      - secretName: api-hook0-fimento-io-tls
         hosts:
-          - hook0-api.fimento.io
+          - api.hook0.fimento.io
 
 frontend:
-  enabled: true
+  replicaCount: 2
   env:
-    API_ENDPOINT: 'https://hook0-api.fimento.io/api/v1'
+    API_ENDPOINT: 'https://api.hook0.fimento.io/api/v1'
+  ingress:
+    hosts:
+      - host: hook0.fimento.io
+        paths:
+          - path: /
+            pathType: Prefix
+    tls:
+      - secretName: hook0-fimento-io-tls
+        hosts:
+          - hook0.fimento.io
 
 outputWorker:
   replicaCount: 2
