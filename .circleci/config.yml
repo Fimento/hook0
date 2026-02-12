@@ -30,10 +30,18 @@ jobs:
       - run:
           name: Build docker images
           command: |
+            set -e
             docker build -t ${AWS_ECR_ACCOUNT}/fimento/hook0-api:latest --build-arg FEATURES="application-secret-compatibility" -f ./api/Dockerfile . &
+            PID_API=$!
             docker build -t ${AWS_ECR_ACCOUNT}/fimento/hook0-frontend:latest -f ./frontend/Dockerfile . &
+            PID_FRONTEND=$!
             docker build -t ${AWS_ECR_ACCOUNT}/fimento/hook0-output-worker:latest -f ./output-worker/Dockerfile . &
-            wait
+            PID_WORKER=$!
+            FAIL=0
+            wait $PID_API || FAIL=1
+            wait $PID_FRONTEND || FAIL=1
+            wait $PID_WORKER || FAIL=1
+            if [ $FAIL -ne 0 ]; then echo "One or more Docker builds failed"; exit 1; fi
       - run:
           name: Authenticate to ECR
           command: |
