@@ -1,0 +1,98 @@
+# Default values for Hook0 (demo environment)
+
+nameOverride: ''
+fullnameOverride: ''
+
+# --- API ---
+api:
+  replicaCount: 1
+  image:
+    repository: 711387106999.dkr.ecr.eu-north-1.amazonaws.com/fimento/hook0-api
+    pullPolicy: Always
+    tag: 'latest'
+  env:
+    IP: '0.0.0.0'
+    PORT: '8081'
+    CORS_ALLOWED_ORIGINS: 'https://hook0.demo.fimento.io'
+    APP_URL: 'https://hook0.demo.fimento.io'
+    EMAIL_SENDER_ADDRESS: 'noreply@fimento.com'
+  secretEnv:
+    DATABASE_URL:
+      secretName: hook0
+      key: DATABASE_URL
+    BISCUIT_PRIVATE_KEY:
+      secretName: hook0
+      key: BISCUIT_PRIVATE_KEY
+    SMTP_CONNECTION_URL:
+      secretName: hook0
+      key: SMTP_CONNECTION_URL
+  ingress:
+    enabled: true
+    className: 'kong'
+    annotations: {}
+    hosts:
+      - host: api.hook0.demo.fimento.io
+        paths:
+          - path: /
+            pathType: Prefix
+    tls:
+      - secretName: api-hook0-demo-fimento-io-tls
+        hosts:
+          - api.hook0.demo.fimento.io
+  resources:
+    limits:
+      memory: 512Mi
+    requests:
+      cpu: 50m
+      memory: 128Mi
+
+# --- Frontend (dashboard) ---
+frontend:
+  enabled: true
+  replicaCount: 1
+  image:
+    repository: 711387106999.dkr.ecr.eu-north-1.amazonaws.com/fimento/hook0-frontend
+    pullPolicy: Always
+    tag: 'latest'
+  env:
+    API_ENDPOINT: 'https://api.hook0.demo.fimento.io/api/v1'
+  ingress:
+    enabled: true
+    className: 'kong'
+    annotations: {}
+    hosts:
+      - host: hook0.demo.fimento.io
+        paths:
+          - path: /
+            pathType: Prefix
+    tls:
+      - secretName: hook0-demo-fimento-io-tls
+        hosts:
+          - hook0.demo.fimento.io
+  resources:
+    limits:
+      memory: 256Mi
+    requests:
+      cpu: 25m
+      memory: 64Mi
+
+# --- Output Worker (webhook delivery) ---
+outputWorker:
+  replicaCount: 1
+  image:
+    repository: 711387106999.dkr.ecr.eu-north-1.amazonaws.com/fimento/hook0-output-worker
+    pullPolicy: Always
+    tag: 'latest'
+  env:
+    WORKER_NAME: 'default'
+    DISABLE_TARGET_IP_CHECK: 'false'
+  secretEnv:
+    DATABASE_URL:
+      secretName: hook0
+      key: DATABASE_URL
+  resources:
+    limits:
+      memory: 512Mi
+    requests:
+      cpu: 50m
+      memory: 128Mi
