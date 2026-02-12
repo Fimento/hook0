@@ -1,15 +1,13 @@
 # Default values for Hook0 (sandbox environment)
-
 nameOverride: ''
 fullnameOverride: ''
-
 # --- API ---
 api:
   replicaCount: 1
   image:
     repository: 711387106999.dkr.ecr.eu-north-1.amazonaws.com/fimento/hook0-api
     pullPolicy: Always
-    tag: 'latest'
+    tag: '9b8557b461c34d52cd2c5e5ad1bc572de67a87ac'
   env:
     IP: '0.0.0.0'
     PORT: '8081'
@@ -45,7 +43,6 @@ api:
     requests:
       cpu: 50m
       memory: 128Mi
-
 # --- Frontend (dashboard) ---
 frontend:
   enabled: true
@@ -53,7 +50,7 @@ frontend:
   image:
     repository: 711387106999.dkr.ecr.eu-north-1.amazonaws.com/fimento/hook0-frontend
     pullPolicy: Always
-    tag: 'latest'
+    tag: '9b8557b461c34d52cd2c5e5ad1bc572de67a87ac'
   env:
     API_ENDPOINT: 'https://api.hook0.sandbox.fimento.io/api/v1'
   ingress:
@@ -75,14 +72,13 @@ frontend:
     requests:
       cpu: 25m
       memory: 64Mi
-
 # --- Output Worker (webhook delivery) ---
 outputWorker:
   replicaCount: 1
   image:
     repository: 711387106999.dkr.ecr.eu-north-1.amazonaws.com/fimento/hook0-output-worker
     pullPolicy: Always
-    tag: 'latest'
+    tag: '9b8557b461c34d52cd2c5e5ad1bc572de67a87ac'
   env:
     WORKER_NAME: 'default'
     DISABLE_TARGET_IP_CHECK: 'false'
