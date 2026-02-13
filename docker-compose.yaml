@@ -46,7 +46,6 @@ services:
       dockerfile: api/Dockerfile
       args:
         FEATURES: "application-secret-compatibility"
-    hostname: hook0-api
     environment:
       - IP=0.0.0.0
       - PORT=8081
@@ -59,8 +58,10 @@ services:
     ports:
       - "8082:8081"
     networks:
-      - hook0
-      - fimento-psd2-infra-dev_fimento-psd2-network-dev
+      hook0:
+      fimento-psd2-infra-dev_fimento-psd2-network-dev:
+        aliases:
+          - hook0-api
     restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "curl --fail --user-agent 'docker-compose-healthcheck' http://localhost:$${PORT}/api/v1/swagger.json || exit 1"]
@@ -76,14 +77,15 @@ services:
     build:
       context: .
       dockerfile: frontend/Dockerfile
-    hostname: hook0-frontend
     environment:
       - API_ENDPOINT=http://localhost:8082/api/v1
     ports:
       - "8002:80"
     networks:
-      - hook0
-      - fimento-psd2-infra-dev_fimento-psd2-network-dev
+      hook0:
+      fimento-psd2-infra-dev_fimento-psd2-network-dev:
+        aliases:
+          - hook0-frontend
     restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "curl --fail --user-agent 'docker-compose-healthcheck' http://localhost || exit 1"]
