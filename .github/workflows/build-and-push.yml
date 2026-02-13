@@ -1,0 +1,67 @@
+name: Build and Push Docker Images to ECR
+
+on:
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  AWS_REGION: eu-north-1
+
+jobs:
+  build-and-push:
+    name: Build and Push Hook0 Images
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v6
+        with:
+          role-to-assume: ${{ secrets.AWS_ECR_DEPLOY_ARN }}
+          role-session-name: github-actions-ecr-push
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: ecr-login
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Write version file
+        run: echo "VERSION=${{ github.sha }}" > version.txt
+
+      - name: Build and push hook0-api
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./api/Dockerfile
+          push: true
+          build-args: FEATURES=application-secret-compatibility
+          tags: |
+            ${{ steps.ecr-login.outputs.registry }}/fimento/hook0-api:latest
+            ${{ steps.ecr-login.outputs.registry }}/fimento/hook0-api:${{ github.sha }}
+
+      - name: Build and push hook0-frontend
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./frontend/Dockerfile
+          push: true
+          tags: |
+            ${{ steps.ecr-login.outputs.registry }}/fimento/hook0-frontend:latest
+            ${{ steps.ecr-login.outputs.registry }}/fimento/hook0-frontend:${{ github.sha }}
+
+      - name: Build and push hook0-output-worker
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./output-worker/Dockerfile
+          push: true
+          tags: |
+            ${{ steps.ecr-login.outputs.registry }}/fimento/hook0-output-worker:latest
+            ${{ steps.ecr-login.outputs.registry }}/fimento/hook0-output-worker:${{ github.sha }}
