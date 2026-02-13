@@ -5,15 +5,25 @@ on:
 
 permissions:
   id-token: write
-  contents: read
+  contents: write
 
 env:
   AWS_REGION: eu-north-1
 
 jobs:
   build-and-push:
-    name: Build and Push Hook0 Images
+    name: Build ${{ matrix.image }}
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - image: hook0-api
+            dockerfile: ./api/Dockerfile
+            build-args: FEATURES=application-secret-compatibility
+          - image: hook0-frontend
+            dockerfile: ./frontend/Dockerfile
+          - image: hook0-output-worker
+            dockerfile: ./output-worker/Dockerfile
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -35,33 +45,33 @@ jobs:
       - name: Write version file
         run: echo "VERSION=${{ github.sha }}" > version.txt
 
-      - name: Build and push hook0-api
+      - name: Build and push ${{ matrix.image }}
         uses: docker/build-push-action@v6
         with:
           context: .
-          file: ./api/Dockerfile
+          file: ${{ matrix.dockerfile }}
           push: true
-          build-args: FEATURES=application-secret-compatibility
+          build-args: ${{ matrix.build-args }}
           tags: |
-            ${{ steps.ecr-login.outputs.registry }}/fimento/hook0-api:latest
-            ${{ steps.ecr-login.outputs.registry }}/fimento/hook0-api:${{ github.sha }}
+            ${{ steps.ecr-login.outputs.registry }}/fimento/${{ matrix.image }}:latest
+            ${{ steps.ecr-login.outputs.registry }}/fimento/${{ matrix.image }}:${{ github.sha }}
 
-      - name: Build and push hook0-frontend
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          file: ./frontend/Dockerfile
-          push: true
-          tags: |
-            ${{ steps.ecr-login.outputs.registry }}/fimento/hook0-frontend:latest
-            ${{ steps.ecr-login.outputs.registry }}/fimento/hook0-frontend:${{ github.sha }}
+  update-tags:
+    name: Update Helm image tags
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
 
-      - name: Build and push hook0-output-worker
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          file: ./output-worker/Dockerfile
-          push: true
-          tags: |
-            ${{ steps.ecr-login.outputs.registry }}/fimento/hook0-output-worker:latest
-            ${{ steps.ecr-login.outputs.registry }}/fimento/hook0-output-worker:${{ github.sha }}
+      - name: Update image tags in Helm values
+        run: |
+          sed -i "s/tag: '.*'/tag: '${{ github.sha }}'/" k8s/values.yaml
+
+      - name: Commit and push updated image tags
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add k8s/values.yaml
+          git commit -m "Update image.tag to ${{ github.sha }} for sandbox [skip ci]"
+          git push
