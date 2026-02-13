@@ -7,7 +7,7 @@ api:
   image:
     repository: 711387106999.dkr.ecr.eu-north-1.amazonaws.com/fimento/hook0-api
     pullPolicy: Always
-    tag: '58147839c2f60049c717b5cdd745d6d9f64bc118'
+    tag: '419df8ea146956ba2b241df7386b5c6f9081730f'
   env:
     IP: '0.0.0.0'
     PORT: '8081'
@@ -50,7 +50,7 @@ frontend:
   image:
     repository: 711387106999.dkr.ecr.eu-north-1.amazonaws.com/fimento/hook0-frontend
     pullPolicy: Always
-    tag: '58147839c2f60049c717b5cdd745d6d9f64bc118'
+    tag: '419df8ea146956ba2b241df7386b5c6f9081730f'
   env:
     API_ENDPOINT: 'https://api.hook0.sandbox.fimento.io/api/v1'
   ingress:
@@ -78,7 +78,7 @@ outputWorker:
   image:
     repository: 711387106999.dkr.ecr.eu-north-1.amazonaws.com/fimento/hook0-output-worker
     pullPolicy: Always
-    tag: '58147839c2f60049c717b5cdd745d6d9f64bc118'
+    tag: '419df8ea146956ba2b241df7386b5c6f9081730f'
   env:
     WORKER_NAME: 'default'
     DISABLE_TARGET_IP_CHECK: 'false'
